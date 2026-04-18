@@ -2169,6 +2169,8 @@
         farmResults.forEach((r) => {
           const daysForMap =
             categoryFilter === "all" ? r.minDays : r.cats[categoryFilter]?.days ?? r.minDays;
+          
+          if (categoryFilter != "all" && daysForMap == 0) return;
           const status = getCrisisClass(daysForMap, duration);
           const col = sc[status];
           const circle = L.circle([r.farm.lat, r.farm.lng], {
