@@ -1003,8 +1003,8 @@
             </div>
             <div style="font-size: 0.8rem; color: var(--text); margin-top: 2px">
               Calculs basés sur les stocks par ferme (Tab B). Le rayon de déplacement simule des
-              scénarios de type COVID où les personnes et agriculteurs ne peuvent se déplacer qu'à
-              une distance limitée.
+              scénarios de type COVID où les personnes ne peuvent se déplacer qu'à une distance
+              limitée.
             </div>
           </div>
         </div>
@@ -1610,9 +1610,6 @@
           Math.sin(dLat / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(dLng / 2) ** 2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       }
-      function transferEfficiency(dist, maxRadius) {
-        return Math.max(0, 1 - dist / maxRadius);
-      }
 
       // TAB SWITCHING
       function switchTab(tab) {
@@ -2042,23 +2039,9 @@
             raw[s.farmId][s.category] += s.quantity;
         });
 
-        // Effective stock after degraded inter-zone transfers
-        const eff = {};
+        const stock = {};
         FARMS.forEach((farm) => {
-          eff[farm.id] = { ...raw[farm.id] };
-          Object.keys(DAILY_NORMS).forEach((cat) => {
-            const need = ((DAILY_NORMS[cat] * popPerFarm) / 1000) * duration * mult;
-            const deficit = Math.max(0, need - raw[farm.id][cat]);
-            if (deficit > 0) {
-              FARMS.filter((d) => d.id !== farm.id).forEach((donor) => {
-                const dist = haversine(farm.lat, farm.lng, donor.lat, donor.lng);
-                const e = transferEfficiency(dist, radius);
-                const donorNeed = ((DAILY_NORMS[cat] * popPerFarm) / 1000) * duration * mult;
-                const surplus = Math.max(0, raw[donor.id][cat] - donorNeed);
-                eff[farm.id][cat] = Math.min(need, eff[farm.id][cat] + surplus * e);
-              });
-            }
-          });
+          stock[farm.id] = { ...raw[farm.id] };
         });
 
         // Per-farm results
@@ -2066,11 +2049,11 @@
           const cats = {};
           Object.keys(DAILY_NORMS).forEach((cat) => {
             const dailyKg = ((DAILY_NORMS[cat] * popPerFarm) / 1000) * mult;
-            const days = dailyKg > 0 ? Math.floor(eff[farm.id][cat] / dailyKg) : 9999;
+            const days = dailyKg > 0 ? Math.floor(stock[farm.id][cat] / dailyKg) : 9999;
             cats[cat] = {
               days,
               raw: raw[farm.id][cat],
-              effective: eff[farm.id][cat],
+              effective: stock[farm.id][cat],
               dailyNeed: dailyKg,
             };
           });
@@ -2162,7 +2145,7 @@
         const sc = { ok: "#27ae60", warn: "#f39c12", crit: "#e74c3c" };
         farmResults.forEach((r) => {
           const daysForMap =
-            categoryFilter === "all" ? r.minDays : r.cats[categoryFilter]?.days ?? r.minDays;
+            categoryFilter === "all" ? r.minDays : (r.cats[categoryFilter]?.days ?? r.minDays);
           if (categoryFilter != "all" && daysForMap == 0) return;
           const status = getCrisisClass(daysForMap, duration);
           const col = sc[status];
