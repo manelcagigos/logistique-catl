@@ -668,6 +668,31 @@
         color: var(--danger);
       }
 
+      .crisis-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 0 0 12px;
+      }
+
+      .crisis-cat-btn {
+        border: 1px solid #dcdfe6;
+        background: white;
+        color: var(--text);
+        border-radius: 20px;
+        padding: 6px 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .crisis-cat-btn.active {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: white;
+      }
+
       .run-btn-wrap {
         text-align: center;
         margin: 20px 0;
@@ -1146,6 +1171,26 @@
           <div class="card-header">
             <div class="card-title">Carte de crise - Zones et rayons</div>
           </div>
+          <div class="crisis-filter-bar" id="crisis-filter-bar">
+            <button class="crisis-cat-btn active" onclick="setCrisisCategoryFilter('all', this)">
+              Toutes catégories
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('cereales', this)">
+              🌾 Céréales
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('conserves', this)">
+              🥫 Conserves
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('frais', this)">
+              🥕 Frais
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('laitiers', this)">
+              🥛 Laitiers
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('viande', this)">
+              🥩 Viande
+            </button>
+          </div>
           <div id="crisis-map"></div>
         </div>
 
@@ -1491,6 +1536,8 @@
       let selectedRadius = 25;
       let crisisMap = null;
       let crisisLayers = [];
+      let selectedCrisisCategory = "all";
+      let lastCrisisRun = null;
       let stockMap = null;
       let stockMarkers = [];
       let importedIds = new Set();
@@ -1919,6 +1966,66 @@
           }[document.getElementById("crisis-type").value] || "";
       }
 
+      function getCrisisClass(days, duration) {
+        return days >= duration ? "ok" : days >= duration * 0.5 ? "warn" : "crit";
+      }
+
+      function setCrisisCategoryFilter(cat, btn) {
+        selectedCrisisCategory = cat;
+        document.querySelectorAll(".crisis-cat-btn").forEach((b) => b.classList.remove("active"));
+        if (btn) btn.classList.add("active");
+        if (lastCrisisRun) renderCrisisZoneViews(lastCrisisRun);
+      }
+
+      function renderCrisisZoneViews(run) {
+        const { farmResults, radius, duration } = run;
+
+        document.getElementById("zone-results-grid").innerHTML = farmResults
+          .map((r) => {
+            const status =
+              selectedCrisisCategory === "all"
+                ? getCrisisClass(r.minDays, duration)
+                : getCrisisClass(r.cats[selectedCrisisCategory].days, duration);
+
+            const details =
+              selectedCrisisCategory === "all"
+                ? Object.entries(r.cats)
+                    .map(([cat, v]) => {
+                      const cls = getCrisisClass(v.days, duration);
+                      return `<div class="zone-cat-row"><span>${CAT_LABELS[cat]}</span><span class="val ${cls}">${v.days >= 9999 ? "∞" : v.days}j</span></div>`;
+                    })
+                    .join("")
+                : (() => {
+                    const cat = selectedCrisisCategory;
+                    const v = r.cats[cat];
+                    const cls = getCrisisClass(v.days, duration);
+                    return `<div class="zone-cat-row"><span>${CAT_LABELS[cat]}</span><span class="val ${cls}">${v.days >= 9999 ? "∞" : v.days}j</span></div>
+                    <div style="margin-top:8px;font-size:.75rem;color:var(--text);">
+                      Stock ferme : <strong>${fmt(v.raw)}</strong> · Besoin/jour : <strong>${v.dailyNeed.toFixed(1)}</strong>
+                    </div>`;
+                  })();
+
+            const autonomyDays =
+              selectedCrisisCategory === "all" ? r.minDays : r.cats[selectedCrisisCategory].days;
+
+            return `
+        <div class="zone-result-card ${status}">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:${r.farm.color};display:inline-block;flex-shrink:0;"></span>
+            <div class="zone-result-name">${r.farm.name}</div>
+          </div>
+          <div style="font-size:.72rem;color:var(--text);margin-bottom:8px;">${r.farm.address}</div>
+          ${details}
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eef2f7;font-size:.78rem;font-weight:700;color:${status === "ok" ? "var(--success)" : status === "warn" ? "var(--warning)" : "var(--danger)"};">
+            Autonomie ${selectedCrisisCategory === "all" ? "min" : "catégorie"} : ${autonomyDays >= 9999 ? "∞" : autonomyDays} jours
+          </div>
+        </div>`;
+          })
+          .join("");
+
+        updateCrisisMapZones(farmResults, radius, duration, selectedCrisisCategory);
+      }
+
       function runCrisisSimulation() {
         const population = parseInt(document.getElementById("population").value);
         const duration = selectedDuration;
@@ -1966,7 +2073,12 @@
           Object.keys(DAILY_NORMS).forEach((cat) => {
             const dailyKg = ((DAILY_NORMS[cat] * popPerFarm) / 1000) * mult;
             const days = dailyKg > 0 ? Math.floor(eff[farm.id][cat] / dailyKg) : 9999;
-            cats[cat] = { days };
+            cats[cat] = {
+              days,
+              raw: raw[farm.id][cat],
+              effective: eff[farm.id][cat],
+              dailyNeed: dailyKg,
+            };
           });
           const minDays = Math.min(...Object.values(cats).map((c) => c.days));
           const status = minDays >= duration ? "ok" : minDays >= duration * 0.5 ? "warn" : "crit";
@@ -2011,31 +2123,8 @@
           `${fmt(population)} personnes · ${duration} jours · Rayon ${radius} km`;
         document.getElementById("radius-label").textContent = radius;
 
-        // Zone cards
-        document.getElementById("zone-results-grid").innerHTML = farmResults
-          .map(
-            (r) => `
-        <div class="zone-result-card ${r.status}">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-            <span style="width:10px;height:10px;border-radius:50%;background:${r.farm.color};display:inline-block;flex-shrink:0;"></span>
-            <div class="zone-result-name">${r.farm.name}</div>
-          </div>
-          <div style="font-size:.72rem;color:var(--text);margin-bottom:8px;">${r.farm.address}</div>
-          ${Object.entries(r.cats)
-            .map(([cat, v]) => {
-              const cls = v.days >= duration ? "ok" : v.days >= duration * 0.5 ? "warn" : "crit";
-              return `<div class="zone-cat-row"><span>${CAT_LABELS[cat]}</span><span class="val ${cls}">${v.days >= 9999 ? "∞" : v.days}j</span></div>`;
-            })
-            .join("")}
-          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eef2f7;font-size:.78rem;font-weight:700;color:${r.status === "ok" ? "var(--success)" : r.status === "warn" ? "var(--warning)" : "var(--danger)"};">
-            Autonomie min : ${r.minDays >= 9999 ? "∞" : r.minDays} jours
-          </div>
-        </div>`,
-          )
-          .join("");
-
-        
-        updateCrisisMapZones(farmResults, radius);
+        lastCrisisRun = { farmResults, radius, duration };
+        renderCrisisZoneViews(lastCrisisRun);
         document.getElementById("crisis-results").classList.add("visible");
         setTimeout(
           () =>
@@ -2072,13 +2161,16 @@
         }).addTo(crisisMap);
       }
 
-      function updateCrisisMapZones(farmResults, radius) {
+      function updateCrisisMapZones(farmResults, radius, duration, categoryFilter = "all") {
         if (!crisisMap) return;
         crisisLayers.forEach((l) => l.remove());
         crisisLayers = [];
         const sc = { ok: "#27ae60", warn: "#f39c12", crit: "#e74c3c" };
         farmResults.forEach((r) => {
-          const col = sc[r.status];
+          const daysForMap =
+            categoryFilter === "all" ? r.minDays : r.cats[categoryFilter]?.days ?? r.minDays;
+          const status = getCrisisClass(daysForMap, duration);
+          const col = sc[status];
           const circle = L.circle([r.farm.lat, r.farm.lng], {
             color: col,
             fillColor: col,
@@ -2086,25 +2178,39 @@
             radius: radius * 1000,
             weight: 2,
           }).addTo(crisisMap);
-          const gaps = Object.entries(r.cats)
-            .filter(([, v]) => v.days < selectedDuration)
-            .map(([cat]) => CAT_LABELS[cat]);
+
+          const popupLine =
+            categoryFilter === "all"
+              ? `Autonomie min : <strong>${r.minDays >= 9999 ? "∞" : r.minDays} jours</strong><br>`
+              : `Autonomie ${CAT_LABELS[categoryFilter]} : <strong>${daysForMap >= 9999 ? "∞" : daysForMap} jours</strong><br>
+          Stock ferme : <strong>${fmt(r.cats[categoryFilter].raw)}</strong> · Besoin/jour : <strong>${r.cats[categoryFilter].dailyNeed.toFixed(1)}</strong><br>`;
+
+          const gaps =
+            categoryFilter === "all"
+              ? Object.entries(r.cats)
+                  .filter(([, v]) => v.days < duration)
+                  .map(([cat]) => CAT_LABELS[cat])
+              : daysForMap < duration
+                ? [CAT_LABELS[categoryFilter]]
+                : [];
+
           circle.bindPopup(`<strong style="color:${r.farm.color};">${r.farm.name}</strong><br>
           <em style="font-size:11px;">${r.farm.address}</em><br>
           <span style="font-size:10px;color:#888;">📍 ${r.farm.lat.toFixed(4)}, ${r.farm.lng.toFixed(4)}</span><br><br>
-          Autonomie min : <strong>${r.minDays >= 9999 ? "∞" : r.minDays} jours</strong><br>
+          ${popupLine}
           ${gaps.length > 0 ? `<span style="color:#e74c3c;">⚠️ Ruptures : ${gaps.join(", ")}</span>` : '<span style="color:#27ae60;">✅ Toutes catégories couvertes</span>'}`);
           crisisLayers.push(circle);
           crisisLayers.push(
             L.marker([r.farm.lat, r.farm.lng], {
               icon: L.divIcon({
-                html: `<div style="background:#333333;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid white;">${r.minDays >= 9999 ? "∞" : r.minDays}j</div>`,
+                html: `<div style="background:#333333;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid white;">${daysForMap >= 9999 ? "∞" : daysForMap}j</div>`,
                 className: "",
                 iconAnchor: [16, 16],
               }),
             }).addTo(crisisMap),
           );
         });
+        crisisMap.invalidateSize();
       }
 
       // INIT
