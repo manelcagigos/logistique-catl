@@ -1337,12 +1337,12 @@
         viande: 8.0,
       };
       const CAT_THRESHOLDS = {
-          cereales: { alert: 90, critical: 30 },
-          conserves: { alert: 180, critical: 60 },
-          frais: { alert: 14, critical: 5 },
-          laitiers: { alert: 30, critical: 10 },
-          viande: { alert: 21, critical: 7 },
-        };
+        cereales: { alert: 90, critical: 30 },
+        conserves: { alert: 180, critical: 60 },
+        frais: { alert: 14, critical: 5 },
+        laitiers: { alert: 30, critical: 10 },
+        viande: { alert: 21, critical: 7 },
+      };
 
       const DEFAULT_STOCK = [
         {
@@ -1353,7 +1353,7 @@
           unit: "kg",
           expiry: "2026-06-15",
           farmId: "f1",
-          receivedDate: '2026-04-01',
+          receivedDate: "2026-04-01",
         },
         {
           id: 2,
@@ -1363,7 +1363,7 @@
           unit: "kg",
           expiry: "2026-10-20",
           farmId: "f2",
-          receivedDate:'2026-02-01',
+          receivedDate: "2026-02-01",
         },
         {
           id: 3,
@@ -1373,7 +1373,7 @@
           unit: "kg",
           expiry: "2026-11-01",
           farmId: "f1",
-          receivedDate: '2026-03-15',
+          receivedDate: "2026-03-15",
         },
         {
           id: 4,
@@ -1383,8 +1383,7 @@
           unit: "kg",
           expiry: "2027-04-17",
           farmId: "f3",
-          receivedDate:'2025-12-03',
-
+          receivedDate: "2025-12-03",
         },
         {
           id: 5,
@@ -1394,7 +1393,7 @@
           unit: "kg",
           expiry: "2026-05-11",
           farmId: "f3",
-          receivedDate:'2026-02-24',
+          receivedDate: "2026-02-24",
         },
         {
           id: 6,
@@ -1404,7 +1403,7 @@
           unit: "L",
           expiry: "2027-01-10",
           farmId: "f2",
-          receivedDate:'2026-01-01',
+          receivedDate: "2026-01-01",
         },
         {
           id: 7,
@@ -1414,7 +1413,7 @@
           unit: "kg",
           expiry: "2028-12-31",
           farmId: "f3",
-          receivedDate:'2026-04-15',
+          receivedDate: "2026-04-15",
         },
         {
           id: 8,
@@ -1424,7 +1423,7 @@
           unit: "kg",
           expiry: "2026-04-22",
           farmId: "f5",
-          receivedDate:'2026-03-27',
+          receivedDate: "2026-03-27",
         },
         {
           id: 9,
@@ -1434,7 +1433,7 @@
           unit: "kg",
           expiry: "2026-06-01",
           farmId: "f4",
-          receivedDate:'2026-04-08',
+          receivedDate: "2026-04-08",
         },
         {
           id: 10,
@@ -1444,7 +1443,7 @@
           unit: "kg",
           expiry: "2026-05-10",
           farmId: "f5",
-          receivedDate:'2026-02-27',
+          receivedDate: "2026-02-27",
         },
         {
           id: 11,
@@ -1454,7 +1453,7 @@
           unit: "L",
           expiry: "2026-06-15",
           farmId: "f2",
-          receivedDate:'2026-01-23',
+          receivedDate: "2026-01-23",
         },
         {
           id: 12,
@@ -1464,7 +1463,7 @@
           unit: "kg",
           expiry: "2026-05-20",
           farmId: "f4",
-          receivedDate:'2025-10-25',
+          receivedDate: "2025-10-25",
         },
         {
           id: 13,
@@ -1474,7 +1473,7 @@
           unit: "kg",
           expiry: "2026-08-01",
           farmId: "f1",
-          receivedDate:'2026-03-02',
+          receivedDate: "2026-03-02",
         },
         {
           id: 14,
@@ -1484,7 +1483,7 @@
           unit: "kg",
           expiry: "2026-07-15",
           farmId: "f4",
-          receivedDate:'2026-04-04',
+          receivedDate: "2026-04-04",
         },
         { id: 15, product: "Riz long grain", category: "cereales", quantity: 50000, unit: "kg", expiry: "2027-06-01", farmId: "f3", receivedDate: "2026-02-01" },
         { id: 16, product: "Pois chiches", category: "cereales", quantity: 40000, unit: "kg", expiry: "2027-08-01", farmId: "f4", receivedDate: "2026-01-15" },
@@ -1608,20 +1607,32 @@
         t.setHours(0, 0, 0, 0);
         return Math.ceil((new Date(d) - t) / 86400000);
       }
-      function expiryBadge(days, category) {
-          const t = CAT_THRESHOLDS[category] || { alert: 30, critical: 7 };
-          if (days < 0) return `<span class="badge badge-danger">Périmé</span>`;
-          if (days <= t.critical) return `<span class="badge badge-danger">Critique - ${days}j</span>`;
-          if (days <= t.alert) return `<span class="badge badge-warning">Alerte - ${days}j</span>`;
-          return `<span class="badge badge-success">${days} jours</span>`;
-        }
 
-        function dotClass(days, category) {
-          const t = CAT_THRESHOLDS[category] || { alert: 30, critical: 7 };
-          if (days <= t.critical) return 'expiry-crit';
-          if (days <= t.alert) return 'expiry-warn';
-          return 'expiry-ok';
-        }
+      function computeUsableQuantity(item, duration) {
+        const daysLeft = daysUntilExpiry(item.expiry);
+
+        if (daysLeft <= 0) return 0;
+
+        const ratio = Math.min(1, daysLeft / duration);
+
+        return item.quantity * ratio;
+      }
+
+      function expiryBadge(days, category) {
+        const t = CAT_THRESHOLDS[category] || { alert: 30, critical: 7 };
+        if (days < 0) return `<span class="badge badge-danger">Périmé</span>`;
+        if (days <= t.critical)
+          return `<span class="badge badge-danger">Critique - ${days}j</span>`;
+        if (days <= t.alert) return `<span class="badge badge-warning">Alerte - ${days}j</span>`;
+        return `<span class="badge badge-success">${days} jours</span>`;
+      }
+
+      function dotClass(days, category) {
+        const t = CAT_THRESHOLDS[category] || { alert: 30, critical: 7 };
+        if (days <= t.critical) return "expiry-crit";
+        if (days <= t.alert) return "expiry-warn";
+        return "expiry-ok";
+      }
       function catBadge(cat) {
         const icons = {
           cereales: "🌾",
@@ -1793,35 +1804,40 @@
 
       // TAB B
       function renderStock() {
-          const stocks = loadStock();
-          const filtered = (currentFilter === 'all' ? stocks : stocks.filter(s => s.category === currentFilter))
-            .sort((a, b) => {
-              if (a.product !== b.product) return a.product.localeCompare(b.product);
-              return new Date(a.receivedDate || a.expiry) - new Date(b.receivedDate || b.expiry);
-            });
+        const stocks = loadStock();
+        const filtered = (
+          currentFilter === "all" ? stocks : stocks.filter((s) => s.category === currentFilter)
+        ).sort((a, b) => {
+          if (a.product !== b.product) return a.product.localeCompare(b.product);
+          return new Date(a.receivedDate || a.expiry) - new Date(b.receivedDate || b.expiry);
+        });
 
-          const oldestLotByProduct = {};
-          filtered.forEach(s => {
-            if (!oldestLotByProduct[s.product]) oldestLotByProduct[s.product] = s.id;
-          });
+        const oldestLotByProduct = {};
+        filtered.forEach((s) => {
+          if (!oldestLotByProduct[s.product]) oldestLotByProduct[s.product] = s.id;
+        });
 
-          const tbody = document.getElementById('stock-body');
-          if (!tbody) return;
+        const tbody = document.getElementById("stock-body");
+        if (!tbody) return;
 
-          tbody.innerHTML = filtered.length === 0
+        tbody.innerHTML =
+          filtered.length === 0
             ? `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text);">Aucun produit dans cette catégorie.</td></tr>`
-            : filtered.map(s => {
-              const days = daysUntilExpiry(s.expiry);
-              const farm = getFarm(s.farmId);
-              const lotNumber = filtered.filter(x =>
-                x.product === s.product &&
-                new Date(x.receivedDate || x.expiry) <= new Date(s.receivedDate || s.expiry)
-              ).length;
-              const fifoBadge = oldestLotByProduct[s.product] === s.id
-                ? '<span class="badge badge-info">Lot 1 - FIFO</span>'
-                : `<span class="badge badge-neutral">Lot ${lotNumber}</span>`;
+            : filtered
+                .map((s) => {
+                  const days = daysUntilExpiry(s.expiry);
+                  const farm = getFarm(s.farmId);
+                  const lotNumber = filtered.filter(
+                    (x) =>
+                      x.product === s.product &&
+                      new Date(x.receivedDate || x.expiry) <= new Date(s.receivedDate || s.expiry),
+                  ).length;
+                  const fifoBadge =
+                    oldestLotByProduct[s.product] === s.id
+                      ? '<span class="badge badge-info">Lot 1 - FIFO</span>'
+                      : `<span class="badge badge-neutral">Lot ${lotNumber}</span>`;
 
-              return `<tr>
+                  return `<tr>
           <td><span class="expiry-dot ${dotClass(days, s.category)}"></span><strong>${s.product}</strong></td>
           <td>${catBadge(s.category)}</td>
           <td><strong>${fmt(s.quantity)}</strong> ${s.unit}</td>
@@ -1831,14 +1847,15 @@
           <td style="font-size:.72rem;color:var(--text);">${farm.address}<br><span style="color:#aaa;">${farm.lat.toFixed(4)}, ${farm.lng.toFixed(4)}</span></td>
           <td><button class="btn btn-outline btn-sm" onclick="deleteStock(${s.id})" style="color:var(--danger);border-color:var(--danger);">✕</button></td>
         </tr>`;
-            }).join('');
+                })
+                .join("");
 
-          updateStockKPIs(stocks);
-          if (stockMap) updateStockMapMarkers(stocks);
-        }
+        updateStockKPIs(stocks);
+        if (stockMap) updateStockMapMarkers(stocks);
+      }
 
       function updateStockKPIs(stocks) {
-        const alerts = stocks.filter(s => {
+        const alerts = stocks.filter((s) => {
           const d = daysUntilExpiry(s.expiry);
           const t = CAT_THRESHOLDS[s.category] || { alert: 30 };
           return d >= 0 && d <= t.alert;
@@ -1851,7 +1868,7 @@
         document.getElementById("kpi-stock-value").textContent = fmt(
           stocks.reduce((a, s) => a + s.quantity * (PRICE_ESTIMATE[s.category] || 1), 0),
         );
-        const critical = stocks.filter(s => {
+        const critical = stocks.filter((s) => {
           const d = daysUntilExpiry(s.expiry);
           const t = CAT_THRESHOLDS[s.category] || { critical: 7 };
           return d >= 0 && d <= t.critical;
@@ -2089,19 +2106,19 @@
         const popPerFarm = population / FARMS.length;
 
         // Raw stock by farm and category
-        const raw = {};
+        const stock = {};
+
         FARMS.forEach((f) => {
-          raw[f.id] = {};
-          Object.keys(DAILY_NORMS).forEach((c) => (raw[f.id][c] = 0));
-        });
-        stocks.forEach((s) => {
-          if (raw[s.farmId] && raw[s.farmId][s.category] !== undefined)
-            raw[s.farmId][s.category] += s.quantity;
+          stock[f.id] = {};
+          Object.keys(DAILY_NORMS).forEach((c) => (stock[f.id][c] = 0));
         });
 
-        const stock = {};
-        FARMS.forEach((farm) => {
-          stock[farm.id] = { ...raw[farm.id] };
+        stocks.forEach((s) => {
+          const usableQty = computeUsableQuantity(s, duration);
+
+          if (stock[s.farmId]?.[s.category] !== undefined) {
+            stock[s.farmId][s.category] += usableQty;
+          }
         });
 
         // Per-farm results
@@ -2112,7 +2129,7 @@
             const days = dailyKg > 0 ? Math.floor(stock[farm.id][cat] / dailyKg) : 9999;
             cats[cat] = {
               days,
-              raw: raw[farm.id][cat],
+              raw: stock[farm.id][cat],
               effective: stock[farm.id][cat],
               dailyNeed: dailyKg,
             };
@@ -2125,7 +2142,7 @@
         // Global totals
         const global = {};
         Object.keys(DAILY_NORMS).forEach((cat) => {
-          const totalStock = FARMS.reduce((s, f) => s + raw[f.id][cat], 0);
+          const totalStock = FARMS.reduce((s, f) => s + stock[f.id][cat], 0);
           const dailyKg = ((DAILY_NORMS[cat] * population) / 1000) * mult;
           const days = dailyKg > 0 ? Math.floor(totalStock / dailyKg) : 9999;
           global[cat] = { totalStock, dailyKg, days };
