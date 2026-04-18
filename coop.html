@@ -1141,23 +1141,14 @@
           <div class="zone-results-grid" id="zone-results-grid"></div>
         </div>
 
-        <div class="two-col">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Efficacité des transferts inter-zones</div>
-            </div>
-            <div
-              id="transfer-legend"
-              style="font-size: 0.85rem; color: var(--text); line-height: 1.8"
-            ></div>
+          
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Carte de crise - Zones et rayons</div>
           </div>
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Carte de crise - Zones et rayons</div>
-            </div>
-            <div id="crisis-map"></div>
-          </div>
+          <div id="crisis-map"></div>
         </div>
+
       </div>
     </div>
 
@@ -2043,36 +2034,7 @@
           )
           .join("");
 
-        // Transfer legend
-        document.getElementById("transfer-legend").innerHTML = `
-        <p style="margin:0 0 10px;font-size:.85rem;font-weight:700;color:var(--primary);">Rayon actuel : ${radius} km</p>
-        <p style="margin:0 0 12px;font-size:.82rem;">L'efficacité d'un transfert entre deux fermes décroît linéairement avec la distance. À ${radius} km, l'efficacité est 0%.</p>
-        ${[0, 5, 10, 15, 20, 30, 40, 50]
-          .filter((d) => d <= radius + 5)
-          .map((d) => {
-            const e = Math.round(transferEfficiency(d, radius) * 100);
-            const color = e >= 70 ? "var(--success)" : e >= 30 ? "var(--warning)" : "var(--danger)";
-            return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-            <span style="font-size:.8rem;min-width:42px;color:var(--text);">${d} km</span>
-            <div style="flex:1;height:6px;background:#eef2f7;border-radius:3px;">
-              <div style="height:6px;border-radius:3px;background:${color};width:${Math.max(1, e)}%;"></div>
-            </div>
-            <span style="font-size:.8rem;font-weight:700;color:${color};min-width:34px;">${e}%</span>
-          </div>`;
-          })
-          .join("")}
-        <p style="margin:14px 0 0;font-size:.8rem;color:var(--text);padding:10px;background:#f4f7f9;border-radius:4px;">
-          ${
-            radius <= 5
-              ? "⚠️ Confinement strict : les fermes ne peuvent pratiquement pas s'entraider."
-              : radius <= 15
-                ? "⚠️ Rayon restreint : seules les fermes très proches peuvent coopérer."
-                : radius <= 30
-                  ? "✅ Rayon modéré : coopération partielle possible entre zones voisines."
-                  : "✅ Rayon étendu : mutualisation optimale des stocks entre toutes les zones."
-          }
-        </p>`;
-
+        
         updateCrisisMapZones(farmResults, radius);
         document.getElementById("crisis-results").classList.add("visible");
         setTimeout(
@@ -2120,7 +2082,7 @@
           const circle = L.circle([r.farm.lat, r.farm.lng], {
             color: col,
             fillColor: col,
-            fillOpacity: 0.82,
+            fillOpacity: 0.2,
             radius: radius * 1000,
             weight: 2,
           }).addTo(crisisMap);
