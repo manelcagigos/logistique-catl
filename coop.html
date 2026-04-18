@@ -1336,6 +1336,13 @@
         laitiers: 1.5,
         viande: 8.0,
       };
+      const CAT_THRESHOLDS = {
+          cereales: { alert: 90, critical: 30 },
+          conserves: { alert: 180, critical: 60 },
+          frais: { alert: 14, critical: 5 },
+          laitiers: { alert: 30, critical: 10 },
+          viande: { alert: 21, critical: 7 },
+        };
 
       const DEFAULT_STOCK = [
         {
@@ -1346,6 +1353,7 @@
           unit: "kg",
           expiry: "2026-06-15",
           farmId: "f1",
+          receivedDate: '2026-04-01',
         },
         {
           id: 2,
@@ -1355,6 +1363,7 @@
           unit: "kg",
           expiry: "2026-10-20",
           farmId: "f2",
+          receivedDate:'2026-02-01',
         },
         {
           id: 3,
@@ -1364,6 +1373,7 @@
           unit: "kg",
           expiry: "2026-11-01",
           farmId: "f1",
+          receivedDate: '2026-03-15',
         },
         {
           id: 4,
@@ -1373,6 +1383,8 @@
           unit: "kg",
           expiry: "2027-04-17",
           farmId: "f3",
+          receivedDate:'2025-12-03',
+
         },
         {
           id: 5,
@@ -1382,6 +1394,7 @@
           unit: "kg",
           expiry: "2026-05-11",
           farmId: "f3",
+          receivedDate:'2026-02-24',
         },
         {
           id: 6,
@@ -1391,6 +1404,7 @@
           unit: "L",
           expiry: "2027-01-10",
           farmId: "f2",
+          receivedDate:'2026-01-01',
         },
         {
           id: 7,
@@ -1400,6 +1414,7 @@
           unit: "kg",
           expiry: "2028-12-31",
           farmId: "f3",
+          receivedDate:'2026-04-15',
         },
         {
           id: 8,
@@ -1409,6 +1424,7 @@
           unit: "kg",
           expiry: "2026-04-22",
           farmId: "f5",
+          receivedDate:'2026-03-27',
         },
         {
           id: 9,
@@ -1418,6 +1434,7 @@
           unit: "kg",
           expiry: "2026-06-01",
           farmId: "f4",
+          receivedDate:'2026-04-08',
         },
         {
           id: 10,
@@ -1427,6 +1444,7 @@
           unit: "kg",
           expiry: "2026-05-10",
           farmId: "f5",
+          receivedDate:'2026-02-27',
         },
         {
           id: 11,
@@ -1436,6 +1454,7 @@
           unit: "L",
           expiry: "2026-06-15",
           farmId: "f2",
+          receivedDate:'2026-01-23',
         },
         {
           id: 12,
@@ -1445,6 +1464,7 @@
           unit: "kg",
           expiry: "2026-05-20",
           farmId: "f4",
+          receivedDate:'2025-10-25',
         },
         {
           id: 13,
@@ -1454,6 +1474,7 @@
           unit: "kg",
           expiry: "2026-08-01",
           farmId: "f1",
+          receivedDate:'2026-03-02',
         },
         {
           id: 14,
@@ -1463,6 +1484,7 @@
           unit: "kg",
           expiry: "2026-07-15",
           farmId: "f4",
+          receivedDate:'2026-04-04',
         },
       ];
 
@@ -1571,15 +1593,20 @@
         t.setHours(0, 0, 0, 0);
         return Math.ceil((new Date(d) - t) / 86400000);
       }
-      function expiryBadge(days) {
-        if (days < 0) return `<span class="badge badge-danger">Périmé</span>`;
-        if (days <= 7) return `<span class="badge badge-danger">Critique - ${days}j</span>`;
-        if (days <= 30) return `<span class="badge badge-warning">Alerte - ${days}j</span>`;
-        return `<span class="badge badge-success">${days} jours</span>`;
-      }
-      function dotClass(days) {
-        return days <= 7 ? "expiry-crit" : days <= 30 ? "expiry-warn" : "expiry-ok";
-      }
+      function expiryBadge(days, category) {
+          const t = CAT_THRESHOLDS[category] || { alert: 30, critical: 7 };
+          if (days < 0) return `<span class="badge badge-danger">Périmé</span>`;
+          if (days <= t.critical) return `<span class="badge badge-danger">Critique - ${days}j</span>`;
+          if (days <= t.alert) return `<span class="badge badge-warning">Alerte - ${days}j</span>`;
+          return `<span class="badge badge-success">${days} jours</span>`;
+        }
+
+        function dotClass(days, category) {
+          const t = CAT_THRESHOLDS[category] || { alert: 30, critical: 7 };
+          if (days <= t.critical) return 'expiry-crit';
+          if (days <= t.alert) return 'expiry-warn';
+          return 'expiry-ok';
+        }
       function catBadge(cat) {
         const icons = {
           cereales: "🌾",
@@ -1669,12 +1696,13 @@
         const stocks = loadStock();
         stocks.push({
           id: getNextId(stocks),
-          product: `${flow.products.split(",")[0].trim()} (apport ${flow.date})`,
+          product: `${flow.products.split(",")[0].trim()}`,
           category: flow.category,
           quantity: Math.round(flow.volume * 0.6),
           unit: "kg",
           expiry: new Date(Date.now() + 21 * 86400000).toISOString().slice(0, 10),
           farmId: flow.farmId,
+          receivedDate: flow.date,
         });
         saveStockData(stocks);
         importedIds.add(flowId);
@@ -1750,39 +1778,55 @@
 
       // TAB B
       function renderStock() {
-        const stocks = loadStock();
-        const filtered = (
-          currentFilter === "all" ? stocks : stocks.filter((s) => s.category === currentFilter)
-        ).sort((a, b) => new Date(a.expiry) - new Date(b.expiry));
-        const tbody = document.getElementById("stock-body");
-        if (!tbody) return;
-        tbody.innerHTML =
-          filtered.length === 0
+          const stocks = loadStock();
+          const filtered = (currentFilter === 'all' ? stocks : stocks.filter(s => s.category === currentFilter))
+            .sort((a, b) => {
+              if (a.product !== b.product) return a.product.localeCompare(b.product);
+              return new Date(a.receivedDate || a.expiry) - new Date(b.receivedDate || b.expiry);
+            });
+
+          const oldestLotByProduct = {};
+          filtered.forEach(s => {
+            if (!oldestLotByProduct[s.product]) oldestLotByProduct[s.product] = s.id;
+          });
+
+          const tbody = document.getElementById('stock-body');
+          if (!tbody) return;
+
+          tbody.innerHTML = filtered.length === 0
             ? `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text);">Aucun produit dans cette catégorie.</td></tr>`
-            : filtered
-                .map((s, idx) => {
-                  const days = daysUntilExpiry(s.expiry);
-                  const farm = getFarm(s.farmId);
-                  return `<tr>
-              <td><span class="expiry-dot ${dotClass(days)}"></span><strong>${s.product}</strong></td>
-              <td>${catBadge(s.category)}</td>
-              <td><strong>${fmt(s.quantity)}</strong> ${s.unit}</td>
-              <td>${expiryBadge(days)}<div style="font-size:.7rem;color:var(--text);margin-top:2px;">${s.expiry}</div></td>
-              <td>${idx === 0 ? '<span class="badge badge-info">Priorité FIFO</span>' : '<span class="badge badge-neutral">-</span>'}</td>
-              <td style="font-size:.8rem;"><span style="color:${farm.color};font-weight:700;">●</span> ${farm.name}</td>
-              <td style="font-size:.72rem;color:var(--text);">${farm.address}<br><span style="color:#aaa;">${farm.lat.toFixed(4)}, ${farm.lng.toFixed(4)}</span></td>
-              <td><button class="btn btn-outline btn-sm" onclick="deleteStock(${s.id})" style="color:var(--danger);border-color:var(--danger);">✕</button></td>
-            </tr>`;
-                })
-                .join("");
-        updateStockKPIs(stocks);
-        if (stockMap) updateStockMapMarkers(stocks);
-      }
+            : filtered.map(s => {
+              const days = daysUntilExpiry(s.expiry);
+              const farm = getFarm(s.farmId);
+              const lotNumber = filtered.filter(x =>
+                x.product === s.product &&
+                new Date(x.receivedDate || x.expiry) <= new Date(s.receivedDate || s.expiry)
+              ).length;
+              const fifoBadge = oldestLotByProduct[s.product] === s.id
+                ? '<span class="badge badge-info">Lot 1 - FIFO</span>'
+                : `<span class="badge badge-neutral">Lot ${lotNumber}</span>`;
+
+              return `<tr>
+          <td><span class="expiry-dot ${dotClass(days, s.category)}"></span><strong>${s.product}</strong></td>
+          <td>${catBadge(s.category)}</td>
+          <td><strong>${fmt(s.quantity)}</strong> ${s.unit}</td>
+          <td>${expiryBadge(days, s.category)}<div style="font-size:.7rem;color:var(--text);margin-top:2px;">${s.expiry}</div></td>
+          <td>${fifoBadge}</td>
+          <td style="font-size:.8rem;"><span style="color:${farm.color};font-weight:700;">●</span> ${farm.name}</td>
+          <td style="font-size:.72rem;color:var(--text);">${farm.address}<br><span style="color:#aaa;">${farm.lat.toFixed(4)}, ${farm.lng.toFixed(4)}</span></td>
+          <td><button class="btn btn-outline btn-sm" onclick="deleteStock(${s.id})" style="color:var(--danger);border-color:var(--danger);">✕</button></td>
+        </tr>`;
+            }).join('');
+
+          updateStockKPIs(stocks);
+          if (stockMap) updateStockMapMarkers(stocks);
+        }
 
       function updateStockKPIs(stocks) {
-        const alerts = stocks.filter((s) => {
+        const alerts = stocks.filter(s => {
           const d = daysUntilExpiry(s.expiry);
-          return d >= 0 && d <= 30;
+          const t = CAT_THRESHOLDS[s.category] || { alert: 30 };
+          return d >= 0 && d <= t.alert;
         }).length;
         document.getElementById("kpi-total-products").textContent = stocks.length;
         document.getElementById("kpi-expiry-alerts").textContent = alerts;
@@ -1792,9 +1836,10 @@
         document.getElementById("kpi-stock-value").textContent = fmt(
           stocks.reduce((a, s) => a + s.quantity * (PRICE_ESTIMATE[s.category] || 1), 0),
         );
-        const critical = stocks.filter((s) => {
+        const critical = stocks.filter(s => {
           const d = daysUntilExpiry(s.expiry);
-          return d >= 0 && d <= 7;
+          const t = CAT_THRESHOLDS[s.category] || { critical: 7 };
+          return d >= 0 && d <= t.critical;
         });
         document.getElementById("alerts-b").innerHTML =
           critical.length > 0
