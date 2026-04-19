@@ -1,0 +1,11 @@
+let currentFilter = "all";
+let selectedDuration = 7;
+let selectedRadius = 25;
+let crisisMap = null;
+let crisisLayers = [];
+let selectedCrisisCategory = "all";
+let lastCrisisRun = null;
+let stockMap = null;
+let stockMarkers = [];
+let importedIds = new Set();
+let activeInflows = [...MOCK_INFLOWS];

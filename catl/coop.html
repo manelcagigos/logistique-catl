@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coopérative CATL - Tableau de Bord</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="assets/css/coop.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  </head>
+  <body>
+    <div class="client-header">
+      <div class="client-identity">
+        <img
+          src="https://www.catl.be/wp-content/uploads/2022/06/CATL_logo_Pano_Vert_Synthese-1.png"
+          alt="CATL"
+          class="client-logo"
+          onerror="this.style.display = 'none'"
+        />
+        <div>
+          <div class="client-title">Coopérative CATL - Tableau de Bord</div>
+          <div class="client-subtitle">
+            Flux entrants · Gestion des stocks · Simulation de crise
+          </div>
+          <span class="header-badge">Module Coopératif v1.0</span>
+        </div>
+      </div>
+      <div style="text-align: right">
+        <a href="../index.html" class="back-link">← Simulateur Logistique</a>
+        <div style="font-size: 0.75rem; color: var(--text); margin-top: 8px" id="last-updated">
+          Données de démonstration
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs-nav" role="tablist">
+      <button class="tab-btn active" onclick="switchTab('a')" id="tab-btn-a">
+        <span>📥</span><span class="tab-label">A - Flux entrants</span>
+        <span class="tab-badge" id="tab-a-badge">5</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('b')" id="tab-btn-b">
+        <span>📦</span><span class="tab-label">B - Stocks coopérative</span>
+        <span class="tab-badge" id="tab-b-badge">14</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('c')" id="tab-btn-c">
+        <span>🚨</span><span class="tab-label">C - Simulateur de crise</span>
+        <span class="tab-badge" id="tab-c-badge">⚡</span>
+      </button>
+    </div>
+
+    <!-- TAB A -->
+    <div class="tab-panel active" id="panel-a">
+      <div id="alerts-a"></div>
+      <div class="kpi-grid">
+        <div class="kpi-card success">
+          <div class="kpi-label">Producteurs connectés</div>
+          <div class="kpi-value">5</div>
+          <div class="kpi-sub">cette semaine</div>
+        </div>
+        <div class="kpi-card accent">
+          <div class="kpi-label">Volume total attendu</div>
+          <div class="kpi-value">2 870</div>
+          <div class="kpi-sub">kg · cette semaine</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Tournées soumises</div>
+          <div class="kpi-value">7</div>
+          <div class="kpi-sub">via simulateur CATL</div>
+        </div>
+        <div class="kpi-card warning">
+          <div class="kpi-label">En attente import</div>
+          <div class="kpi-value" id="kpi-pending">2</div>
+          <div class="kpi-sub">apports non confirmés</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Apports programmés - Semaine en cours</div>
+          <button class="btn btn-outline btn-sm" onclick="refreshInflows()">↻ Actualiser</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Producteur</th>
+                <th>Adresse ferme</th>
+                <th>Catégorie</th>
+                <th>Produits</th>
+                <th>Volume est.</th>
+                <th>Valeur (€)</th>
+                <th>Date</th>
+                <th>Statut</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="inflows-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Historique - Apports enregistrés en stock</div>
+        </div>
+        <div
+          id="import-history"
+          style="font-size: 0.875rem; color: var(--text); text-align: center; padding: 20px"
+        >
+          Les apports validés apparaissent ici et sont enregistrés automatiquement dans les stocks
+          (Tab B).
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB B -->
+    <div class="tab-panel" id="panel-b">
+      <div id="alerts-b"></div>
+      <div class="kpi-grid">
+        <div class="kpi-card success">
+          <div class="kpi-label">Références en stock</div>
+          <div class="kpi-value" id="kpi-total-products">-</div>
+          <div class="kpi-sub">produits actifs</div>
+        </div>
+        <div class="kpi-card danger">
+          <div class="kpi-label">Alertes péremption</div>
+          <div class="kpi-value" id="kpi-expiry-alerts">-</div>
+          <div class="kpi-sub">dans les 30 jours</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Stock total</div>
+          <div class="kpi-value" id="kpi-total-weight">-</div>
+          <div class="kpi-sub">kg / litres au total</div>
+        </div>
+        <div class="kpi-card accent">
+          <div class="kpi-label">Valeur estimée</div>
+          <div class="kpi-value" id="kpi-stock-value">-</div>
+          <div class="kpi-sub">€ (estimation)</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Inventaire du stock coopératif</div>
+          <button class="btn btn-success btn-sm" onclick="openAddModal()">
+            + Ajouter un produit
+          </button>
+        </div>
+        <div class="filter-bar">
+          <button class="filter-btn active" onclick="filterStock('all', this)">Tous</button>
+          <button class="filter-btn" onclick="filterStock('cereales', this)">🌾 Céréales</button>
+          <button class="filter-btn" onclick="filterStock('conserves', this)">
+            🥫 Conserves & Condiments
+          </button>
+          <button class="filter-btn" onclick="filterStock('frais', this)">🥕 Produits frais</button>
+          <button class="filter-btn" onclick="filterStock('laitiers', this)">🥛 Laitiers</button>
+          <button class="filter-btn" onclick="filterStock('viande', this)">🥩 Viande</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Produit</th>
+                <th>Catégorie</th>
+                <th>Quantité</th>
+                <th>Péremption</th>
+                <th>FIFO</th>
+                <th>Ferme / Origine</th>
+                <th>Adresse &amp; Coordonnées</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="stock-body"></tbody>
+          </table>
+        </div>
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eef2f7">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 10px;
+            "
+          >
+            <span class="card-title">Carte des stocks par ferme</span>
+            <span style="font-size: 0.78rem; color: var(--text)"
+              >Cliquez sur un marqueur pour voir le détail</span
+            >
+          </div>
+          <div id="stock-map"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB C -->
+    <div class="tab-panel" id="panel-c">
+      <div
+        class="card"
+        style="background: #fff8f8; border-color: #fcd0d0; border-top: 4px solid var(--danger)"
+      >
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span style="font-size: 1.5rem">🚨</span>
+          <div>
+            <div
+              style="
+                font-weight: 700;
+                color: #c0392b;
+                font-size: 0.9rem;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+              "
+            >
+              Simulateur de Résilience Alimentaire - Multi-Zones
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text); margin-top: 2px">
+              Calculs basés sur les stocks par ferme (Tab B). Le rayon de déplacement simule des
+              scénarios de type COVID où les personnes ne peuvent se déplacer qu'à une distance
+              limitée.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="crisis-params">
+        <div class="crisis-param-card">
+          <label>Population à couvrir</label>
+          <div class="range-wrap">
+            <div class="range-val">
+              <span id="pop-val">5 000</span>
+              <span style="font-size: 0.85rem; font-weight: 400; color: var(--text)"
+                >personnes</span
+              >
+            </div>
+            <input
+              type="range"
+              id="population"
+              min="500"
+              max="50000"
+              step="500"
+              value="5000"
+              oninput="updatePopDisplay()"
+            />
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.72rem;
+                color: var(--text);
+              "
+            >
+              <span>500</span><span>50 000</span>
+            </div>
+          </div>
+        </div>
+        <div class="crisis-param-card">
+          <label>Durée de la crise simulée</label>
+          <div class="duration-btns">
+            <button class="dur-btn active" onclick="setDuration(7, this)">1 sem.</button>
+            <button class="dur-btn" onclick="setDuration(14, this)">2 sem.</button>
+            <button class="dur-btn" onclick="setDuration(28, this)">4 sem.</button>
+            <button class="dur-btn" onclick="setDuration(60, this)">2 mois</button>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text); margin-top: 10px">
+            Durée : <strong id="duration-display">7 jours</strong>
+          </div>
+        </div>
+        <div class="crisis-param-card">
+          <label>Type de scénario</label>
+          <select
+            id="crisis-type"
+            style="
+              width: 100%;
+              padding: 9px;
+              border: 1px solid #dcdfe6;
+              border-radius: 4px;
+              font-size: 0.875rem;
+            "
+            onchange="updateCrisisDesc()"
+          >
+            <option value="standard">⚡ Rupture logistique standard</option>
+            <option value="severe">🌪️ Crise sévère (réduction 30%)</option>
+            <option value="extreme">☠️ Crise extrême (réduction 50%)</option>
+          </select>
+          <div
+            style="font-size: 0.78rem; color: var(--text); margin-top: 10px"
+            id="crisis-type-desc"
+          >
+            Flux entrants bloqués, consommation normale maintenue.
+          </div>
+        </div>
+        <div class="crisis-param-card">
+          <label>🚗 Rayon de déplacement maximal</label>
+          <div class="range-wrap">
+            <div class="range-val">
+              <span id="radius-val">15</span>
+              <span style="font-size: 0.85rem; font-weight: 400; color: var(--text)">km</span>
+            </div>
+            <input
+              type="range"
+              id="crisis-radius"
+              min="1"
+              max="25"
+              step="1"
+              value="15"
+              oninput="updateRadiusDisplay()"
+            />
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                font-size: 0.72rem;
+                color: var(--text);
+              "
+            >
+              <span>1 km (confinement strict)</span><span>25 km</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="run-btn-wrap">
+        <button class="run-btn" onclick="runCrisisSimulation()">🚨 LANCER LA SIMULATION</button>
+      </div>
+
+      <div class="crisis-results" id="crisis-results">
+        <div class="card" style="border-top: 4px solid var(--danger)">
+          <div class="card-header">
+            <div class="card-title">Vue d'ensemble - Autonomie globale</div>
+            <div style="font-size: 0.8rem; color: var(--text)" id="sim-summary"></div>
+          </div>
+          <div class="autonomy-grid" id="autonomy-grid"></div>
+          <div
+            style="
+              padding: 15px;
+              background: #fafbfc;
+              border-radius: 6px;
+              border: 1px solid #eef2f7;
+            "
+          >
+            <div
+              style="
+                font-size: 0.78rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                color: var(--text);
+                margin-bottom: 8px;
+              "
+            >
+              Produit limitant global
+            </div>
+            <div
+              style="font-size: 1rem; font-weight: 700; color: var(--danger)"
+              id="bottleneck-product"
+            >
+              -
+            </div>
+            <div
+              style="font-size: 0.8rem; color: var(--text); margin-top: 4px"
+              id="bottleneck-desc"
+            ></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              Analyse par zone (ferme) - Rayon <span id="radius-label">25</span> km
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text)">
+              Vert = couvert · Orange = partiel · Rouge = rupture
+            </div>
+          </div>
+          <div class="zone-results-grid" id="zone-results-grid"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Carte de crise - Zones et rayons</div>
+          </div>
+          <div class="crisis-filter-bar" id="crisis-filter-bar">
+            <button class="crisis-cat-btn active" onclick="setCrisisCategoryFilter('all', this)">
+              Toutes catégories
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('cereales', this)">
+              🌾 Céréales
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('conserves', this)">
+              🥫 Conserves
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('frais', this)">
+              🥕 Frais
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('laitiers', this)">
+              🥛 Laitiers
+            </button>
+            <button class="crisis-cat-btn" onclick="setCrisisCategoryFilter('viande', this)">
+              🥩 Viande
+            </button>
+          </div>
+          <div id="crisis-map"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL -->
+    <div class="modal-overlay" id="add-modal">
+      <div class="modal">
+        <div class="modal-title">+ Ajouter un produit au stock</div>
+        <div class="form-row">
+          <div class="form-group" style="flex: 2">
+            <label>Nom du produit *</label>
+            <input type="text" id="m-product" placeholder="Ex : Farine de blé" />
+          </div>
+          <div class="form-group">
+            <label>Catégorie *</label>
+            <select id="m-category">
+              <option value="cereales">🌾 Céréales & légumineuses</option>
+              <option value="conserves">🥫 Conserves & Condiments</option>
+              <option value="frais">🥕 Produits frais</option>
+              <option value="laitiers">🥛 Laitiers</option>
+              <option value="viande">🥩 Viande</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantité *</label>
+            <input type="number" id="m-quantity" placeholder="0" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Unité</label>
+            <select id="m-unit">
+              <option value="kg">kg</option>
+              <option value="L">litres (L)</option>
+              <option value="unités">unités</option>
+              <option value="boîtes">boîtes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date de péremption *</label>
+            <input type="date" id="m-expiry" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Ferme / Producteur *</label>
+            <select id="m-farm" onchange="fillFarmCoords()">
+              <option value="">- Choisir une ferme -</option>
+            </select>
+          </div>
+        </div>
+        <div
+          style="
+            font-size: 0.75rem;
+            color: var(--text);
+            margin-top: -8px;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: #f4f7f9;
+            border-radius: 4px;
+            min-height: 32px;
+          "
+          id="m-farm-coords"
+        >
+          Sélectionnez une ferme pour voir ses coordonnées.
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeAddModal()">Annuler</button>
+          <button class="btn btn-success" onclick="saveNewStock()">✓ Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+
+    <!-- SCRIPTS — order matters -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/tabs.js"></script>
+    <script src="js/tab-a.js"></script>
+    <script src="js/tab-b.js"></script>
+    <script src="js/tab-c.js"></script>
+    <script src="js/map-stock.js"></script>
+    <script src="js/map-crisis.js"></script>
+    <script src="js/main.js"></script>
+
+  </body>
+</html>
