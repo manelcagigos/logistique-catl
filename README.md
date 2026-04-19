@@ -4,6 +4,8 @@
 
 Ce dépôt est un fork du **Simulateur de Logistique en Circuit Court** de la CATL (Ceinture Aliment-Terre Liégeoise). Il conserve l'outil original intact et y ajoute un **tableau de bord coopératif** permettant de gérer les stocks alimentaires stratégiques et de simuler des scénarios de crise multi-zones.
 
+- **Démo :** [manelcagigos.github.io/logistique-catl/catl/coop.html](https://manelcagigos.github.io/logistique-catl/catl/coop.html)
+
 ## Ce qui a changé par rapport au fork original
 
 ### `index.html` - modification mineure
@@ -21,7 +23,7 @@ Ce bouton permet aux gestionnaires de la coopérative d'accéder directement au 
 `coop.html` est le point d'entrée du tableau de bord coopératif. Le code JavaScript et CSS a été séparé en fichiers distincts pour plus de lisibilité :
 
 ```
-logistique-catl/
+catl/
 ├── index.html              ← Simulateur original (bouton ajouté dans le header)
 ├── coop.html               ← Tableau de bord coopératif (entrée HTML uniquement)
 ├── assets/
